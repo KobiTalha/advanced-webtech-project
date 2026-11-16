@@ -15,13 +15,21 @@ export class MailService {
 
   async sendMail(to: string, subject: string, html: string): Promise<void> {
     const host = this.configService.get<string>('MAIL_HOST');
-    const port = this.configService.get<number>('MAIL_PORT', 587);
+    const port = Number(
+      this.configService.get<string | number>('MAIL_PORT', 587),
+    );
     const user = this.configService.get<string>('MAIL_USER');
     const password = this.configService.get<string>('MAIL_PASSWORD');
     const from = this.configService.get<string>('MAIL_FROM');
 
     if (!host || !from) {
       throw new ServiceUnavailableException('SMTP configuration is incomplete');
+    }
+
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+      throw new ServiceUnavailableException(
+        'SMTP port configuration is invalid',
+      );
     }
 
     const transporter = nodemailer.createTransport({
