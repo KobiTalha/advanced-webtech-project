@@ -1,39 +1,164 @@
+
 import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 
-import { User } from '../users/entities/user.entity';
-import { Category } from '../categories/entities/category.entity';
-import { Course } from '../courses/entities/course.entity';
-import { Lesson } from '../lessons/entities/lesson.entity';
+import { InjectRepository } from '@nestjs/typeorm';
+import { In, Repository } from 'typeorm';
+
+import { Course } from '../courses/course.entity';
+import { Enrollment } from '../enrollments/enrollment.entity';
+import { Assignment } from '../assignments/assignment.entity';
+import { Submission } from '../submissions/submission.entity';
+
+import { EnrollmentStatus } from '../common/enums/enrollment-status.enum';
+import { InstructorListQueryDto } from './dto/instructor-list-query.dto';
 
 @Injectable()
 export class InstructorService {
   constructor(
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
-
-    @InjectRepository(Category)
-    private readonly categoryRepository: Repository<Category>,
-
     @InjectRepository(Course)
     private readonly courseRepository: Repository<Course>,
 
-    @InjectRepository(Lesson)
-    private readonly lessonRepository: Repository<Lesson>,
+    @InjectRepository(Enrollment)
+    private readonly enrollmentRepository: Repository<Enrollment>,
+
+    @InjectRepository(Assignment)
+    private readonly assignmentRepository: Repository<Assignment>,
+
+    @InjectRepository(Submission)
+    private readonly submissionRepository: Repository<Submission>,
   ) {}
 
-  private async findOwnedCourse(
+  // -----------------------------------------
+  // INSTRUCTOR DASHBOARD
+  // -----------------------------------------
+
+  async getDashboard(instructorId: string) {
+    const courses = await this.courseRepository.find({
+      where: { instructor_id: instructorId },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+      },
+    });
+
+    const courseIds = courses.map((course) => course.id);
+
+    if (courseIds.length === 0) {
+      return {
+        statistics: {
+          total_courses: 0,
+          active_students: 0,
+          total_assignments: 0,
+          pending_submissions: 0,
+        },
+        courses: [],
+      };
+    }
+
+    const [
+      activeStudents,
+      totalAssignments,
+      pendingSubmissions,
+    ] = await Promise.all([
+      this.enrollmentRepository.count({
+        where: {
+          course_id: In(courseIds),
+          status: EnrollmentStatus.ACTIVE,
+        },
+      }),
+
+      this.assignmentRepository.count({
+        where: {
+          course_id: In(courseIds),
+        },
+      }),
+
+      this.submissionRepository
+        .createQueryBuilder('submission')
+        .innerJoin('submission.assignment', 'assignment')
+        .where('assignment.course_id IN (:...courseIds)', {
+          courseIds,
+        })
+        .andWhere('submission.marks_obtained IS NULL')
+        .getCount(),
+    ]);
+
+    return {
+      statistics: {
+        total_courses: courses.length,
+        active_students: activeStudents,
+        total_assignments: totalAssignments,
+        pending_submissions: pendingSubmissions,
+      },
+      courses,
+    };
+  }
+
+  // -----------------------------------------
+  // LIST INSTRUCTOR COURSES
+  // -----------------------------------------
+
+  async getMyCourses(
+    instructorId: string,
+    query: InstructorListQueryDto,
+  ) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 10;
+    const [courses, total] = await this.courseRepository.findAndCount({
+      where: {
+        instructor_id: instructorId,
+      },
+      relations: {
+        category: true,
+      },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        capacity: true,
+        enrolled_count: true,
+        status: true,
+        created_at: true,
+        category: {
+          id: true,
+          name: true,
+        },
+      },
+      order: {
+        created_at: 'DESC',
+      },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    return {
+      data: courses,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  // -----------------------------------------
+  // VIEW COURSE STUDENTS
+  // -----------------------------------------
+
+  async getCourseStudents(
     courseId: string,
     instructorId: string,
-  ): Promise<Course> {
+    query: InstructorListQueryDto,
+  ) {
     const course = await this.courseRepository.findOne({
       where: {
         id: courseId,
-        instructor: { id: instructorId },
+        instructor_id: instructorId,
       },
     });
 
@@ -43,178 +168,55 @@ export class InstructorService {
       );
     }
 
-    return course;
-  }
-
-  async createCourse(
-    instructorId: string,
-    dto: CreateCourseDto,
-  ) {
-    const [instructor, category] = await Promise.all([
-      this.userRepository.findOne({
-        where: { id: instructorId },
-      }),
-
-      this.categoryRepository.findOne({
-        where: { id: dto.categoryId },
-      }),
-    ]);
-
-    if (!instructor) {
-      throw new NotFoundException('Instructor not found');
-    }
-
-    if (!category) {
-      throw new NotFoundException('Category not found');
-    }
-
-    const course = this.courseRepository.create({
-      title: dto.title,
-      description: dto.description,
-      instructor,
-      category,
-    });
-
-    return this.courseRepository.save(course);
-  }
-
-  async getMyCourses(instructorId: string) {
-    return this.courseRepository.find({
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 10;
+    const [enrollments, total] = await this.enrollmentRepository.findAndCount({
       where: {
-        instructor: { id: instructorId },
+        course_id: courseId,
+        status: EnrollmentStatus.ACTIVE,
       },
       relations: {
-        category: true,
+        student: true,
       },
-      order: {
-        createdAt: 'DESC',
-      },
-    });
-  }
-
-  async updateCourse(
-    courseId: string,
-    instructorId: string,
-    dto: UpdateCourseDto,
-  ) {
-    const course = await this.findOwnedCourse(
-      courseId,
-      instructorId,
-    );
-
-    if (dto.categoryId) {
-      const category = await this.categoryRepository.findOne({
-        where: { id: dto.categoryId },
-      });
-
-      if (!category) {
-        throw new NotFoundException('Category not found');
-      }
-
-      course.category = category;
-    }
-
-    if (dto.title !== undefined) {
-      course.title = dto.title;
-    }
-
-    if (dto.description !== undefined) {
-      course.description = dto.description;
-    }
-
-    if (dto.status !== undefined) {
-      course.status = dto.status;
-    }
-
-    return this.courseRepository.save(course);
-  }
-
-  async createLesson(
-    courseId: string,
-    instructorId: string,
-    dto: CreateLessonDto,
-  ) {
-    const course = await this.findOwnedCourse(
-      courseId,
-      instructorId,
-    );
-
-    const lesson = this.lessonRepository.create({
-      title: dto.title,
-      description: dto.description,
-      content: dto.content,
-      videoUrl: dto.videoUrl,
-      position: dto.position ?? 1,
-      course,
-    });
-
-    return this.lessonRepository.save(lesson);
-  }
-
-  async getCourseLessons(
-    courseId: string,
-    instructorId: string,
-  ) {
-    await this.findOwnedCourse(courseId, instructorId);
-
-    return this.lessonRepository.find({
-      where: {
-        course: { id: courseId },
-      },
-      order: {
-        position: 'ASC',
-      },
-    });
-  }
-
-  async updateLesson(
-    lessonId: string,
-    instructorId: string,
-    dto: UpdateLessonDto,
-  ) {
-    const lesson = await this.lessonRepository.findOne({
-      where: {
-        id: lessonId,
-        course: {
-          instructor: { id: instructorId },
+      select: {
+        id: true,
+        student_id: true,
+        course_id: true,
+        status: true,
+        enrolled_at: true,
+        student: {
+          id: true,
+          full_name: true,
+          email: true,
+          is_active: true,
         },
       },
-    });
-
-    if (!lesson) {
-      throw new NotFoundException(
-        'Lesson not found or you do not own its course',
-      );
-    }
-
-    Object.assign(lesson, dto);
-
-    return this.lessonRepository.save(lesson);
-  }
-
-  async deleteLesson(
-    lessonId: string,
-    instructorId: string,
-  ) {
-    const lesson = await this.lessonRepository.findOne({
-      where: {
-        id: lessonId,
-        course: {
-          instructor: { id: instructorId },
-        },
+      order: {
+        enrolled_at: 'DESC',
       },
+      skip: (page - 1) * limit,
+      take: limit,
     });
-
-    if (!lesson) {
-      throw new NotFoundException(
-        'Lesson not found or you do not own its course',
-      );
-    }
-
-    await this.lessonRepository.remove(lesson);
 
     return {
-      message: 'Lesson deleted successfully',
+      course: {
+        id: course.id,
+        title: course.title,
+      },
+      total_students: total,
+      pagination: {
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+      students: enrollments.map((enrollment) => ({
+        enrollment_id: enrollment.id,
+        student_id: enrollment.student_id,
+        full_name: enrollment.student.full_name,
+        email: enrollment.student.email,
+        is_active: enrollment.student.is_active,
+        enrolled_at: enrollment.enrolled_at,
+      })),
     };
   }
 }
