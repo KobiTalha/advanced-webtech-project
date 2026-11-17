@@ -19,9 +19,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const secret = configService.get<string>('JWT_SECRET');
 
     if (!secret) {
-      throw new Error(
-        'JWT_SECRET is missing from environment configuration',
-      );
+      throw new Error('JWT_SECRET is missing from environment configuration');
     }
 
     super({
@@ -31,7 +29,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(payload: { sub?: string }) {
+  async validate(payload: { sub?: string; version?: number }) {
     if (
       !payload ||
       typeof payload.sub !== 'string' ||
@@ -56,6 +54,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     if (!user.is_active) {
       throw new UnauthorizedException('Account is inactive');
+    }
+
+    if ((payload.version ?? 0) !== (user.token_version ?? 0)) {
+      throw new UnauthorizedException('Session expired; log in again');
     }
 
     return {

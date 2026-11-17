@@ -1,34 +1,61 @@
-# Dependencies and build output
-/node_modules/
-/dist/
-/build/
+# compiled output
+/dist
+/node_modules
+/build
+
+# TypeScript build cache
 *.tsbuildinfo
 
-# Test coverage
-/coverage/
-/.nyc_output/
-
-# Logs and runtime files
-/logs/
+# Logs
+logs
 *.log
-/pids/
-*.pid
-*.pid.lock
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
 
-# Local environment files; keep safe templates trackable
+# OS
+.DS_Store
+
+# Tests
+/coverage
+/.nyc_output
+
+# IDEs and editors
+/.idea
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# IDE - VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# dotenv environment variable files
 .env
 .env.*
 !.env.example
-!.env.*.example
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local
 
-# Temporary files
-/.temp/
-/.tmp/
+# temp directory
+.temp
+.tmp
 
-# Local editor settings
-/.idea/
-/.vscode/
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
 
-# Operating system files
-.DS_Store
-Thumbs.db
+# Diagnostic reports (https://nodejs.org/api/report.html)
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json

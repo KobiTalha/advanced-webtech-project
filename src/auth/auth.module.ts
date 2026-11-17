@@ -1,4 +1,10 @@
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { MailModule } from '../mail/mail.module';
+import { PasswordReset } from './password-reset.entity';
+import { PasswordResetService } from './password-reset.service';
+import { PasswordResetController } from './password-reset.controller';
 
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
@@ -15,6 +21,9 @@ import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
+    TypeOrmModule.forFeature([PasswordReset]),
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 5 }]),
+    MailModule,
     UsersModule,
 
     PassportModule.register({
@@ -37,17 +46,10 @@ import { NotificationsModule } from '../notifications/notifications.module';
     NotificationsModule,
   ],
 
-  controllers: [AuthController],
+  controllers: [AuthController, PasswordResetController],
 
-  providers: [
-    AuthService,
-    JwtStrategy,
-  ],
+  providers: [PasswordResetService, ThrottlerGuard, AuthService, JwtStrategy],
 
-  exports: [
-    AuthService,
-    JwtModule,
-    PassportModule,
-  ],
+  exports: [AuthService, JwtModule, PassportModule],
 })
 export class AuthModule {}

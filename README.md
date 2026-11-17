@@ -1,292 +1,115 @@
-# EduSphere – Online Learning Platform REST API
+# EduSphere API
 
-**Course:** CSC4161 – Advance Programming in Web Technology  
-**Project Type:** Backend REST API  
-**Framework:** NestJS with TypeScript  
-**Database:** PostgreSQL  
-**ORM:** TypeORM  
+EduSphere is a role-based REST API for an online learning platform. It uses NestJS, TypeORM, and PostgreSQL to manage users, courses, lessons, enrollments, assignments, submissions, notifications, and audit history.
 
----
+## Requirements
 
-## 1. Project Overview
-
-EduSphere is a role-based online learning platform developed as a backend REST API using NestJS, TypeScript, TypeORM, and PostgreSQL.
-
-The platform provides a centralized system for managing courses, lessons, student enrollments, assignments, submissions, grading, teaching assistant activities, notifications, and user administration.
-
-EduSphere implements four distinct user roles:
-
-- **Admin:** Manages users, assigns teaching assistants, and oversees the platform.
-- **Instructor:** Creates and manages courses, lessons, assignments, and evaluates student submissions.
-- **Teaching Assistant (TA):** Assists instructors by reviewing submissions and providing grading recommendations.
-- **Student:** Enrolls in courses, accesses lessons, submits assignments, and tracks academic progress.
-
-The application follows a modular architecture with JWT-based authentication, role-based authorization, database transactions, input validation, and centralized exception handling.
-
-The project is backend-focused. API endpoints can be accessed and tested using Swagger UI or Postman.
-
----
-
-## 2. Key Features
-
-### Authentication and Authorization
-- User registration and login.
-- JWT-based authentication.
-- Password hashing using bcrypt.
-- Role-based access control using guards.
-- Protected API endpoints.
-- Custom decorators for roles, public routes, and authenticated users.
-
-### User Management
-- User profile retrieval and updates.
-- Administrator-controlled user management.
-- Role assignment and account status management.
-
-### Course Management
-- Course creation and management.
-- Course publishing and archiving.
-- Course categorization.
-- Course enrollment management.
-
-### Lesson Management
-- Create, update, retrieve, and delete lessons.
-- Retrieve lessons associated with a course.
-- Track student lesson completion.
-- Monitor course progress.
-
-### Assignment and Submission Management
-- Create and manage assignments.
-- Student assignment submissions.
-- Instructor grading.
-- Teaching assistant submission reviews.
-- TA grading recommendations.
-
-### Notification System
-- User-specific notification retrieval.
-- Email notifications for supported platform events.
-- Notification status management.
-
-### Audit Logging
-- Records important system activities.
-- Tracks the user responsible for changes.
-- Stores entity information and change history.
-- Records previous and updated values where supported.
-
-### Additional Features
-- Request ID middleware.
-- HTTP request logging middleware.
-- Response transformation interceptor.
-- Request timing interceptor.
-- Global exception filter.
-- Environment variable validation.
-- Database migrations.
-- Transactional database operations.
-
----
-
-## 3. Technology Stack
-
-| Technology | Purpose |
-|---|---|
-| NestJS | Backend framework |
-| TypeScript | Programming language |
-| PostgreSQL | Relational database |
-| TypeORM | ORM and database migrations |
-| JWT | Authentication |
-| Passport | Authentication strategy |
-| bcrypt | Password hashing |
-| class-validator | DTO validation |
-| class-transformer | Data transformation |
-| Joi | Environment validation |
-| @nestjs/swagger | API documentation |
-| Nodemailer | Email delivery |
-| Jest | Unit and integration testing |
-| Git & GitHub | Version control |
-| Postman | API testing |
-
----
-
-## 4. System Architecture
-
-EduSphere follows a modular NestJS architecture. Each feature is organized into its own module, controller, service, entity, and DTOs where applicable.
-
-### Project Structure
-
-```text
-edusphere/
-│
-├── src/
-│   │
-│   ├── admin/
-│   ├── auth/
-│   ├── assignments/
-│   ├── audit-logs/
-│   ├── categories/
-│   ├── common/
-│   │   ├── decorators/
-│   │   ├── enums/
-│   │   ├── filters/
-│   │   ├── guards/
-│   │   ├── interceptors/
-│   │   └── middleware/
-│   │
-│   ├── config/
-│   ├── courses/
-│   ├── database/
-│   │   ├── migrations/
-│   │   ├── data-source.ts
-│   │   └── seed-admin.ts
-│   │
-│   ├── enrollments/
-│   ├── instructor/
-│   ├── lessons/
-│   ├── mail/
-│   │   └── templates/
-│   │
-│   ├── notifications/
-│   ├── submissions/
-│   ├── teaching-assistant/
-│   ├── users/
-│   │
-│   ├── app.module.ts
-│   └── main.ts
-│
-├── test/
-├── .env.example
-├── .gitignore
-├── package.json
-├── tsconfig.json
-└── README.md
-```
-
-### Prerequisites
-
-Install the following before running the project:
-
-- Node.js
+- Node.js 20.19+ or 22.12+
+- PostgreSQL 14+
 - npm
-- PostgreSQL
-- Git
 
-### Step 1: Clone the Repository
+## Setup
 
-```bash
-git clone https://github.com/KobiTalha/advanced-webtech-project.git
-```
+1. Install dependencies:
 
-Navigate to the project directory:
+   ```bash
+   npm install
+   ```
 
-```bash
-cd advanced-webtech-project/edusphere
-```
+2. Create a PostgreSQL database, then copy `.env.example` to `.env` and set the database credentials and a JWT secret of at least 32 characters. SMTP settings are optional for local development; configure them to deliver email through an SMTP sandbox or mail provider.
 
-### Step 2: Install Dependencies
+3. Build the schema from the versioned migrations:
 
-```bash
-npm install
-```
+   ```bash
+   npm run migration:run
+   ```
 
-### Step 3: Configure Environment Variables
+4. Optionally create the initial administrator by setting `ADMIN_NAME`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD` in `.env`, then running:
 
-Create a `.env` file using the provided example:
+   ```bash
+   npm run seed:admin
+   ```
 
-```bash
-cp .env.example .env
-```
+5. Start the API:
 
-On Windows PowerShell:
+   ```bash
+   npm run start:dev
+   ```
 
-```powershell
-Copy-Item .env.example .env
-```
+The API listens at `http://localhost:3000/api`. Interactive Swagger documentation is at `http://localhost:3000/api/docs`.
 
-Configure the required environment variables:
+## Configuration
 
-```env
-NODE_ENV=development
-PORT=3000
+Configuration is loaded from `.env` through `@nestjs/config` and validated at startup with Joi. `.env.example` lists the supported settings. Do not commit `.env` or real credentials.
 
-DB_HOST=localhost
-DB_PORT=5432
-DB_USERNAME=postgres
-DB_PASSWORD=your_database_password
-DB_NAME=edusphere_db
+| Variable | Purpose |
+| --- | --- |
+| `PORT` | HTTP port (default `3000`) |
+| `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_NAME` | PostgreSQL connection |
+| `JWT_SECRET` | Signing key; minimum 32 characters |
+| `JWT_EXPIRES_IN` | Access-token lifetime (default `15m`) |
+| `MAIL_HOST`, `MAIL_PORT`, `MAIL_USER`, `MAIL_PASSWORD`, `MAIL_FROM` | SMTP delivery settings |
+| `ADMIN_NAME`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` | Optional seed administrator |
 
-JWT_SECRET=your_secret_key_at_least_32_characters
-JWT_EXPIRES_IN=15m
+TypeORM schema synchronization is disabled. Apply schema changes with migrations and use `npm run migration:revert` to revert the latest migration.
 
-ADMIN_NAME=System Administrator
-ADMIN_EMAIL=admin@example.com
-ADMIN_PASSWORD=your_admin_password
+## API areas
 
-MAIL_HOST=
-MAIL_PORT=587
-MAIL_USER=
-MAIL_PASSWORD=
-MAIL_FROM=
-```
+- Authentication: registration and login return JWT bearer tokens.
+- Users, categories, courses, lessons, assignments, and enrollments: role-controlled resource operations.
+- Submissions: student submission, instructor grading, and teaching-assistant recommendations.
+- Notifications: per-user delivery history.
+- Audit logs: administrator-only, filterable change history.
 
-**Important:** Replace example values with your actual local configuration. Never commit `.env` or real credentials to GitHub.
+Protected routes require `Authorization: Bearer <token>`. The roles are `ADMIN`, `INSTRUCTOR`, `TA`, and `STUDENT`. List endpoints support `page` and `limit` pagination where applicable.
 
-### Step 4: Create the PostgreSQL Database
+## Project requirements implemented
 
-Create a database named:
+- DTO validation and a consistent HTTP error format.
+- PostgreSQL relations, migrations, and transactional enrollment and grading workflows with row locks.
+- Request ID and request logging middleware; role and current-user decorators; timing, response, and audit interceptors.
+- SMTP email notifications using HTML templates in `src/mail/templates`.
+- Audit records include the actor, entity, old and new values, request IP, and timestamp.
 
-```sql
-CREATE DATABASE edusphere_db;
-```
-
-Ensure that the database credentials match your `.env` configuration.
-
-### Step 5: Run Database Migrations
-
-Build the database schema using the existing migration files:
-
-```bash
-npm run migration:run
-```
-
-To revert the most recent migration:
-
-```bash
-npm run migration:revert
-```
-
-### Step 6: Create the Initial Administrator
-
-Configure the administrator information in `.env`, then execute:
-
-```bash
-npm run seed:admin
-```
-
-The seed script creates the initial administrator account.
-
-### Step 7: Start the Application
-
-Development mode:
-
-```bash
-npm run start:dev
-```
-
-Production mode:
+## Commands
 
 ```bash
 npm run build
-npm run start:prod
+npm run lint
+npm run test
+npm run test:e2e
+npm run migration:run
+npm run migration:revert
 ```
 
-The API will be available at:
+The Jest unit and end-to-end tests use the scripts above. Set `NODE_ENV=test` and provide test database settings before running database-dependent checks.
 
-```text
-http://localhost:3000/api
-```
+## Role workflows
 
-Swagger documentation:
+Administrators manage users, categories and TA assignments. Only instructors publish courses and final grades. TAs can read courses, lessons and assignments only for courses to which they are assigned; their recommendations remain internal to course staff. Students see final instructor marks and feedback.
 
-```text
-http://localhost:3000/api/docs
-```
+| Method and route (under `/api`) | Access and purpose |
+| --- | --- |
+| `PATCH /courses/:id/instructor` | Admin transfers the course to an active instructor; body: `{ "instructor_id": "uuid" }` |
+| `GET /courses`, `GET /courses/:id` | TAs can discover and read only assigned courses |
+| `GET /courses/:courseId/lessons`, `GET /lessons/:id` | Assigned TAs can read lesson content |
+| `GET /courses/:courseId/assignments`, `GET /assignments/:id` | Assigned TAs can read assignment instructions and maximum marks |
+| `GET /courses/:courseId/students/:studentId/progress` | Owning instructor or admin reads a student's lesson progress |
+| `GET /teaching-assistant/submissions/:submissionId/reviews` | Assigned TA, owning instructor or admin reads the full review history |
+| `PATCH /submissions/:id` | Student replaces their own unreviewed submission before the deadline; body: `{ "submission_url": "https://example.com/work" }` |
+| `POST /auth/forgot-password` | Public; body: `{ "email": "student@example.com" }`; generic response, reset token sent only by email |
+| `POST /auth/reset-password` | Public; body: `{ "token": "token-from-email", "password": "new-password" }`; resets password and invalidates previous login tokens |
 
----
+Transfer or archive an instructor's non-archived courses before deactivating them or changing their role. Transfers preserve lessons, assignments, student enrollments, grades and review history.
+
+`COMPLETED` enrollment records mean all lessons were marked complete, not that the student has passed every assignment. Both active and completed students may submit work until the deadline in a published course. Completing a lesson is idempotent. Submission replacement is blocked after any TA review or final grade, preserving the meaning of existing feedback. Maximum marks are fixed once the first submission exists; other assignment details remain editable. TA recommendations cannot change after an instructor has finalized the grade. Submission creation, replacement and grading record audit history in their database transaction.
+
+### Password recovery setup
+
+Run `npm run migration:run` before starting the updated application. The `AddPasswordRecovery1794910000000` migration adds a password-reset table and a user token version. Configure SMTP to receive recovery emails; no reset token is returned in API responses or stored in plaintext. Tokens expire after 15 minutes and are consumed once. Recovery endpoints allow five requests per IP per minute, with a one-minute email cooldown per account. The built-in rate-limit store is per application instance; a multi-instance deployment needs shared rate-limit storage.
+
+Existing version-zero access tokens continue to work until expiry unless the user's password is reset. A successful reset invalidates older token versions immediately. Database migration and SMTP delivery must be verified in the target environment.
+
+### Database and API regression checks
+
+`npm run test:workflows` builds the application, creates a disposable database on the configured local PostgreSQL server, applies all migrations and exercises the role workflows through HTTP. It verifies a deliberate transaction rollback and captures emails locally without sending them. The database login needs permission to create databases. The test database is deleted afterward; the configured project database receives no test fixtures.

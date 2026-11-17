@@ -24,18 +24,13 @@ export class AuthService {
   ) {}
 
   async register(registerDto: RegisterDto) {
-    const existingUser = await this.usersService.findByEmail(
-      registerDto.email,
-    );
+    const existingUser = await this.usersService.findByEmail(registerDto.email);
 
     if (existingUser) {
       throw new ConflictException('Email already registered');
     }
 
-    const passwordHash = await bcrypt.hash(
-      registerDto.password,
-      12,
-    );
+    const passwordHash = await this.hashPassword(registerDto.password);
 
     const user = await this.usersService.create({
       full_name: registerDto.full_name,
@@ -64,21 +59,16 @@ export class AuthService {
   }
 
   async login(loginDto: LoginDto) {
-    const user =
-      await this.usersService.findByEmailWithPassword(
-        loginDto.email,
-      );
+    const user = await this.usersService.findByEmailWithPassword(
+      loginDto.email,
+    );
 
     if (!user) {
-      throw new UnauthorizedException(
-        'Invalid email or password',
-      );
+      throw new UnauthorizedException('Invalid email or password');
     }
 
     if (!user.is_active) {
-      throw new UnauthorizedException(
-        'Your account is inactive',
-      );
+      throw new UnauthorizedException('Your account is inactive');
     }
 
     const passwordMatches = await bcrypt.compare(
@@ -87,9 +77,7 @@ export class AuthService {
     );
 
     if (!passwordMatches) {
-      throw new UnauthorizedException(
-        'Invalid email or password',
-      );
+      throw new UnauthorizedException('Invalid email or password');
     }
 
     const accessToken = await this.generateToken(user);
@@ -107,14 +95,19 @@ export class AuthService {
   }
 
   private async generateToken(
-    user: Pick<User, 'id' | 'email' | 'role'>,
+    user: Pick<User, 'id' | 'email' | 'role' | 'token_version'>,
   ): Promise<string> {
     const payload = {
       sub: user.id,
       email: user.email,
       role: user.role,
+      version: user.token_version ?? 0,
     };
 
     return this.jwtService.signAsync(payload);
+  }
+
+  async hashPassword(password: string): Promise<string> {
+    return bcrypt.hash(password, 12);
   }
 }
