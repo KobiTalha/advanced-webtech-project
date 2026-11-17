@@ -1,30 +1,27 @@
 import {
-  IsDateString,
-  IsNotEmpty,
-  IsNumber,
-  IsOptional,
   IsString,
-  Max,
+  IsNotEmpty,
+  IsDateString,
+  IsNumber,
+  IsPositive,
   MaxLength,
-  Min,
 } from 'class-validator';
 
 export class CreateAssignmentDto {
   @IsString()
   @IsNotEmpty()
-  @MaxLength(150)
+  @MaxLength(200)
   title: string;
 
-  @IsOptional()
   @IsString()
-  description?: string;
+  @IsNotEmpty()
+  @MaxLength(5000)
+  instructions: string;
 
   @IsDateString()
-  dueDate: string;
+  deadline: string;
 
-  @IsOptional()
   @IsNumber({ maxDecimalPlaces: 2 })
-  @Min(1)
-  @Max(999.99)
-  totalMarks?: number;
+  @IsPositive()
+  max_marks: number;
 }

@@ -1,106 +1,87 @@
 import {
-  Body,
   Controller,
-  Delete,
   Get,
-  Param,
-  ParseUUIDPipe,
-  Patch,
   Post,
-  Req,
-  UseGuards,
+  Patch,
+  Delete,
+  Param,
+  Body,
+  ParseUUIDPipe,
+  Query,
 } from '@nestjs/common';
-
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiTags,
-} from '@nestjs/swagger';
-
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../common/guards/roles.guard';
-import { Roles } from '../common/decorators/roles.decorator';
-import { UserRole } from '../common/enums/user-role.enum';
+import { ApiTags, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 
 import { AssignmentsService } from './assignments.service';
 import { CreateAssignmentDto } from './dto/create-assignment.dto';
 import { UpdateAssignmentDto } from './dto/update-assignment.dto';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { Roles } from '../common/decorators/roles.decorator';
+import { UserRole } from '../common/enums/user-role.enum';
 
 @ApiTags('Assignments')
 @ApiBearerAuth('JWT-auth')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.INSTRUCTOR)
-@Controller('assignments')
+@Controller()
 export class AssignmentsController {
-  constructor(
-    private readonly assignmentsService: AssignmentsService,
-  ) {}
+  constructor(private readonly assignmentsService: AssignmentsService) {}
 
-  @Post('courses/:courseId')
-  @ApiOperation({ summary: 'Create an assignment for an owned course' })
+  // Create assignment.
+  @Roles(UserRole.INSTRUCTOR, UserRole.ADMIN)
+  @Post('courses/:courseId/assignments')
   create(
-    @Req() req: any,
     @Param('courseId', ParseUUIDPipe) courseId: string,
     @Body() dto: CreateAssignmentDto,
+    @CurrentUser() user: any,
   ) {
-    return this.assignmentsService.create(
-      req.user.userId,
-      courseId,
-      dto,
-    );
+    return this.assignmentsService.create(courseId, dto, user);
   }
 
-  @Get('courses/:courseId')
-  @ApiOperation({ summary: 'List assignments in an owned course' })
-  findCourseAssignments(
-    @Req() req: any,
+  // List assignments in a course.
+  @Roles(UserRole.STUDENT, UserRole.TA, UserRole.INSTRUCTOR, UserRole.ADMIN)
+  @Get('courses/:courseId/assignments')
+  @ApiQuery({ name: 'page', required: false, type: Number, minimum: 1 })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    minimum: 1,
+    maximum: 100,
+  })
+  findAll(
     @Param('courseId', ParseUUIDPipe) courseId: string,
+    @CurrentUser() user: any,
+    @Query('page') page = '1',
+    @Query('limit') limit = '10',
   ) {
-    return this.assignmentsService.findCourseAssignments(
+    return this.assignmentsService.findAll(
       courseId,
-      req.user.userId,
+      user,
+      Number(page),
+      Number(limit),
     );
   }
 
-  @Patch(':assignmentId')
-  @ApiOperation({ summary: 'Update an owned assignment' })
+  // View individual assignment.
+  @Roles(UserRole.STUDENT, UserRole.TA, UserRole.INSTRUCTOR, UserRole.ADMIN)
+  @Get('assignments/:id')
+  findOne(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: any) {
+    return this.assignmentsService.findOne(id, user);
+  }
+
+  // Update assignment.
+  @Roles(UserRole.INSTRUCTOR, UserRole.ADMIN)
+  @Patch('assignments/:id')
   update(
-    @Req() req: any,
-    @Param('assignmentId', ParseUUIDPipe) assignmentId: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateAssignmentDto,
+    @CurrentUser() user: any,
   ) {
-    return this.assignmentsService.update(
-      assignmentId,
-      req.user.userId,
-      dto,
-    );
+    return this.assignmentsService.update(id, dto, user);
   }
 
-  @Delete(':assignmentId')
-  @ApiOperation({ summary: 'Delete an owned assignment' })
-  remove(
-    @Req() req: any,
-    @Param('assignmentId', ParseUUIDPipe) assignmentId: string,
-  ) {
-    return this.assignmentsService.remove(
-      assignmentId,
-      req.user.userId,
-    );
+  // Delete assignment.
+  @Roles(UserRole.INSTRUCTOR, UserRole.ADMIN)
+  @Delete('assignments/:id')
+  remove(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: any) {
+    return this.assignmentsService.remove(id, user);
   }
-  
-  @Get('student/courses/:courseId')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.STUDENT)
-@ApiOperation({
-  summary: 'View assignments in an enrolled course',
-})
-findStudentCourseAssignments(
-  @Req() req: any,
-  @Param('courseId', ParseUUIDPipe) courseId: string,
-) {
-  return this.assignmentsService.findStudentCourseAssignments(
-    courseId,
-    req.user.userId,
-  );
-}
 }

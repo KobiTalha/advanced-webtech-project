@@ -1,74 +1,66 @@
+import { UserRole } from '../common/enums/user-role.enum';
+
 import {
+  Body,
   Controller,
   Get,
   Param,
   ParseUUIDPipe,
+  Patch,
   Req,
-  UseGuards,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import type { Request } from 'express';
 
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiTags,
-} from '@nestjs/swagger';
-
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../common/guards/roles.guard';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
-import { UserRole } from '../common/enums/user-role.enum';
+import { RecommendSubmissionDto } from '../submissions/dto/recommend-submission.dto';
 
 import { TeachingAssistantService } from './teaching-assistant.service';
 
+@Controller('teaching-assistant')
 @ApiTags('Teaching Assistant')
 @ApiBearerAuth('JWT-auth')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.TEACHING_ASSISTANT)
-@Controller('teaching-assistant')
+@Roles(UserRole.TA)
 export class TeachingAssistantController {
   constructor(
-    private readonly taService: TeachingAssistantService,
+    private readonly teachingAssistantService: TeachingAssistantService,
   ) {}
 
   @Get('courses')
-  @ApiOperation({ summary: 'Get assigned courses' })
-  getMyCourses(@Req() req: any) {
-    return this.taService.getMyCourses(req.user.userId);
-  }
-
-  @Get('courses/:courseId/lessons')
-  @ApiOperation({ summary: 'View lessons of an assigned course' })
-  getCourseLessons(
-    @Req() req: any,
-    @Param('courseId', ParseUUIDPipe) courseId: string,
-  ) {
-    return this.taService.getCourseLessons(
-      courseId,
-      req.user.userId,
-    );
-  }
-
-  @Get('courses/:courseId/assignments')
-  @ApiOperation({ summary: 'View assignments of an assigned course' })
-  getCourseAssignments(
-    @Req() req: any,
-    @Param('courseId', ParseUUIDPipe) courseId: string,
-  ) {
-    return this.taService.getCourseAssignments(
-      courseId,
-      req.user.userId,
-    );
+  listAssignedCourses(@CurrentUser('id') userId: string) {
+    return this.teachingAssistantService.listAssignedCourses(userId);
   }
 
   @Get('assignments/:assignmentId/submissions')
-  @ApiOperation({ summary: 'View submissions for an assigned course assignment' })
-  getAssignmentSubmissions(
-    @Req() req: any,
+  listSubmissions(
     @Param('assignmentId', ParseUUIDPipe) assignmentId: string,
+    @CurrentUser('id') userId: string,
   ) {
-    return this.taService.getAssignmentSubmissions(
-      assignmentId,
-      req.user.userId,
+    return this.teachingAssistantService.listSubmissions(assignmentId, userId);
+  }
+
+  @Patch('submissions/:submissionId/recommendation')
+  recommend(
+    @Param('submissionId', ParseUUIDPipe) submissionId: string,
+    @Body() dto: RecommendSubmissionDto,
+    @CurrentUser('id') userId: string,
+    @Req() request: Request,
+  ) {
+    return this.teachingAssistantService.recommend(
+      submissionId,
+      dto,
+      userId,
+      request.ip,
     );
+  }
+
+  @Get('submissions/:submissionId/reviews')
+  @Roles(UserRole.TA, UserRole.INSTRUCTOR, UserRole.ADMIN)
+  getReviewHistory(
+    @Param('submissionId', ParseUUIDPipe) submissionId: string,
+    @CurrentUser() user: { id: string; role: UserRole },
+  ) {
+    return this.teachingAssistantService.getReviewHistory(submissionId, user);
   }
 }

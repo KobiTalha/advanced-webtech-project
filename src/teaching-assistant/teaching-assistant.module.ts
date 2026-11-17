@@ -1,32 +1,29 @@
+
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { TeachingAssistantCourse } from '../teaching-assistant/entities/teaching-assistant-course.entity';
-
-import { AuthModule } from '../auth/auth.module';
-
-import { TeachingAssistantCourse } from './entities/teaching-assistant-course.entity';
-import { Course } from '../courses/entities/course.entity';
-import { Lesson } from '../lessons/entities/lesson.entity';
-import { Assignment } from '../assignments/entities/assignment.entity';
-import { Submission } from '../submissions/entities/submission.entity';
 
 import { TeachingAssistantController } from './teaching-assistant.controller';
 import { TeachingAssistantService } from './teaching-assistant.service';
 
+import { TeachingAssistantAssignment } from './teaching-assistant-assignment.entity';
+import { TaReview } from './ta-review.entity';
+
+import { Assignment } from '../assignments/assignment.entity';
+import { Submission } from '../submissions/submission.entity';
+import { AuditLog } from '../audit-logs/audit-log.entity';
+
 @Module({
   imports: [
-    AuthModule,
-
     TypeOrmModule.forFeature([
-      TeachingAssistantCourse,
-      Course,
-      Lesson,
+      TeachingAssistantAssignment,
+      TaReview,
       Assignment,
       Submission,
+      AuditLog,
     ]),
   ],
-
   controllers: [TeachingAssistantController],
   providers: [TeachingAssistantService],
+  exports: [TeachingAssistantService],
 })
 export class TeachingAssistantModule {}

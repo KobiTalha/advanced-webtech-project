@@ -1,26 +1,34 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
-import { AuthModule } from '../auth/auth.module';
+import { Assignment } from './assignment.entity';
+import { Course } from '../courses/course.entity';
+import { Enrollment } from '../enrollments/enrollment.entity';
+import { Submission } from '../submissions/submission.entity';
 
-import { Assignment } from './entities/assignment.entity';
-import { Course } from '../courses/entities/course.entity';
-
-import { AssignmentsController } from './assignments.controller';
 import { AssignmentsService } from './assignments.service';
-import { Enrollment } from '../enrollments/entities/enrollment.entity';
+import { AssignmentsController } from './assignments.controller';
 
 @Module({
   imports: [
-    AuthModule,
     TypeOrmModule.forFeature([
       Assignment,
       Course,
       Enrollment,
+      Submission,
     ]),
   ],
-  controllers: [AssignmentsController],
-  providers: [AssignmentsService],
-  exports: [AssignmentsService],
+
+  controllers: [
+    AssignmentsController,
+  ],
+
+  providers: [
+    AssignmentsService,
+  ],
+
+  exports: [
+    AssignmentsService,
+  ],
 })
 export class AssignmentsModule {}

@@ -1,4 +1,3 @@
-
 import {
   Entity,
   PrimaryGeneratedColumn,
@@ -19,8 +18,6 @@ import { Category } from '../categories/category.entity';
 import { Lesson } from '../lessons/lesson.entity';
 import { Enrollment } from '../enrollments/enrollment.entity';
 import { Assignment } from '../assignments/assignment.entity';
-import { TeachingAssistantAssignment } from '../teaching-assistant/teaching-assistant-assignment.entity';
-import { TeachingAssistantCourse } from '../../teaching-assistant/entities/teaching-assistant-course.entity';
 
 @Entity('courses')
 @Check('CHK_course_capacity', '"capacity" > 0')
@@ -65,7 +62,6 @@ export class Course {
   @UpdateDateColumn()
   updated_at: Date;
 
-  // Course belongs to one instructor
   @ManyToOne(() => User, (user) => user.courses, {
     nullable: false,
     onDelete: 'RESTRICT',
@@ -73,7 +69,6 @@ export class Course {
   @JoinColumn({ name: 'instructor_id' })
   instructor: User;
 
-  // Course belongs to one category
   @ManyToOne(() => Category, (category) => category.courses, {
     nullable: false,
     onDelete: 'RESTRICT',
@@ -81,28 +76,12 @@ export class Course {
   @JoinColumn({ name: 'category_id' })
   category: Category;
 
-  // One course has many lessons
   @OneToMany(() => Lesson, (lesson) => lesson.course)
   lessons: Lesson[];
-  
-  @OneToMany(
-  () => TeachingAssistantCourse,
-  (assignment) => assignment.course,
-)
-  teachingAssistantAssignments: TeachingAssistantCourse[];
-  
-  // One course has many enrollments
+
   @OneToMany(() => Enrollment, (enrollment) => enrollment.course)
   enrollments: Enrollment[];
 
-  // One course has many assignments
   @OneToMany(() => Assignment, (assignment) => assignment.course)
   assignments: Assignment[];
-
-  // One course can have multiple TA assignments
-  @OneToMany(
-    () => TeachingAssistantAssignment,
-    (assignment) => assignment.course,
-  )
-  teachingAssistantAssignments: TeachingAssistantAssignment[];
 }

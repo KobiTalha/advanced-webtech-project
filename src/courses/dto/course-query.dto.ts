@@ -1,38 +1,39 @@
 import {
-  IsIn,
-  IsInt,
   IsOptional,
   IsString,
   IsUUID,
-  Max,
+  IsEnum,
+  IsInt,
   Min,
+  Max,
 } from 'class-validator';
 
 import { Type } from 'class-transformer';
+import { CourseStatus } from '../../common/enums/course-status.enum';
 
 export class CourseQueryDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page = 1;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit = 10;
+
   @IsOptional()
   @IsString()
   search?: string;
 
   @IsOptional()
   @IsUUID()
-  categoryId?: string;
+  category_id?: string;
 
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  page: number = 1;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(50)
-  limit: number = 10;
-
-  @IsOptional()
-  @IsIn(['newest', 'oldest', 'title'])
-  sort: 'newest' | 'oldest' | 'title' = 'newest';
+  @IsEnum(CourseStatus)
+  status?: CourseStatus;
 }
