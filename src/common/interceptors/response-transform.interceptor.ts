@@ -13,14 +13,23 @@ interface RequestWithId extends Request {
 }
 
 @Injectable()
-export class ResponseTransformInterceptor implements NestInterceptor {
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
-    const request = context.switchToHttp().getRequest<RequestWithId>();
+export class ResponseTransformInterceptor
+  implements NestInterceptor {
+
+  intercept(
+    context: ExecutionContext,
+    next: CallHandler,
+  ): Observable<any> {
+
+    const request = context
+      .switchToHttp()
+      .getRequest<RequestWithId>();
 
     const requestId = request.requestId;
 
     return next.handle().pipe(
       map((response) => {
+
         // Avoid wrapping an already standardized response.
         if (
           response &&

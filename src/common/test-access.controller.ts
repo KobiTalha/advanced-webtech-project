@@ -1,4 +1,7 @@
-import { Controller, Get } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+} from '@nestjs/common';
 
 import { Roles } from './decorators/roles.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
@@ -7,8 +10,11 @@ import { UserRole } from './enums/user-role.enum';
 
 @Controller('test-access')
 export class TestAccessController {
+
   @Get('profile')
-  getProfile(@CurrentUser() user: any) {
+  getProfile(
+    @CurrentUser() user: any,
+  ) {
     return {
       message: 'Authenticated successfully',
       user,
@@ -38,12 +44,12 @@ export class TestAccessController {
       message: 'Welcome, student',
     };
   }
-
+  
   @Get('ta')
-  @Roles(UserRole.TA)
-  taOnly() {
-    return {
-      message: 'Welcome, teaching assistant',
-    };
-  }
+@Roles(UserRole.TA)
+taOnly() {
+  return {
+    message: 'Welcome, teaching assistant',
+  };
+}
 }

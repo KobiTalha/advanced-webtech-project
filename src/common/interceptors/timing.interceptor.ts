@@ -10,16 +10,25 @@ import { Response } from 'express';
 
 @Injectable()
 export class TimingInterceptor implements NestInterceptor {
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+  intercept(
+    context: ExecutionContext,
+    next: CallHandler,
+  ): Observable<any> {
+
     const startTime = Date.now();
 
-    const response = context.switchToHttp().getResponse<Response>();
+    const response = context
+      .switchToHttp()
+      .getResponse<Response>();
 
     return next.handle().pipe(
       tap(() => {
         const duration = Date.now() - startTime;
 
-        response.setHeader('X-Response-Time', `${duration}ms`);
+        response.setHeader(
+          'X-Response-Time',
+          `${duration}ms`,
+        );
       }),
     );
   }
