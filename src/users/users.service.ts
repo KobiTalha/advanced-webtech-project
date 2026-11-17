@@ -1,3 +1,6 @@
+import { Course } from '../courses/course.entity';
+import { CourseStatus } from '../common/enums/course-status.enum';
+import { Not } from 'typeorm';
 
 import {
   Injectable,
@@ -50,9 +53,7 @@ export class UsersService {
     });
   }
 
-  async findByEmailWithPassword(
-    email: string,
-  ): Promise<User | null> {
+  async findByEmailWithPassword(email: string): Promise<User | null> {
     return this.userRepository
       .createQueryBuilder('user')
       .addSelect('user.password_hash')
@@ -73,31 +74,27 @@ export class UsersService {
   }
 
   async getAllUsers(page = 1, limit = 10) {
-    const safePage =
-      Number.isFinite(page) && page >= 1
-        ? Math.floor(page)
-        : 1;
+    const safePage = Number.isFinite(page) && page >= 1 ? Math.floor(page) : 1;
 
     const safeLimit =
       Number.isFinite(limit) && limit >= 1
         ? Math.min(100, Math.floor(limit))
         : 10;
 
-    const [users, total] =
-      await this.userRepository.findAndCount({
-        select: {
-          id: true,
-          full_name: true,
-          email: true,
-          role: true,
-          is_active: true,
-          created_at: true,
-          updated_at: true,
-        },
-        order: { created_at: 'DESC' },
-        skip: (safePage - 1) * safeLimit,
-        take: safeLimit,
-      });
+    const [users, total] = await this.userRepository.findAndCount({
+      select: {
+        id: true,
+        full_name: true,
+        email: true,
+        role: true,
+        is_active: true,
+        created_at: true,
+        updated_at: true,
+      },
+      order: { created_at: 'DESC' },
+      skip: (safePage - 1) * safeLimit,
+      take: safeLimit,
+    });
 
     return {
       data: users,
@@ -124,10 +121,7 @@ export class UsersService {
     };
   }
 
-  async updateProfile(
-    id: string,
-    dto: UpdateProfileDto,
-  ) {
+  async updateProfile(id: string, dto: UpdateProfileDto) {
     const user = await this.findById(id);
 
     if (dto.email && dto.email !== user.email) {
@@ -147,10 +141,7 @@ export class UsersService {
     return this.getUserDetails(updatedUser.id);
   }
 
-  async updateRole(
-    id: string,
-    dto: UpdateUserRoleDto,
-  ) {
+  async updateRole(id: string, dto: UpdateUserRoleDto) {
     await this.dataSource.transaction(async (manager) => {
       // Lock active administrator records before checking the count.
       const activeAdmins = await manager
@@ -185,6 +176,18 @@ export class UsersService {
         );
       }
 
+      if (
+        user.role === UserRole.INSTRUCTOR &&
+        dto.role !== UserRole.INSTRUCTOR
+      ) {
+        const owned = await manager.count(Course, {
+          where: { instructor_id: id, status: Not(CourseStatus.ARCHIVED) },
+        });
+        if (owned)
+          throw new BadRequestException(
+            'Transfer or archive this instructor’s courses before changing their role',
+          );
+      }
       user.role = dto.role;
 
       await manager.save(User, user);
@@ -222,9 +225,7 @@ export class UsersService {
       }
 
       if (user.id === actingAdminId && !dto.is_active) {
-        throw new BadRequestException(
-          'You cannot deactivate your own account',
-        );
+        throw new BadRequestException('You cannot deactivate your own account');
       }
 
       if (
@@ -238,6 +239,18 @@ export class UsersService {
         );
       }
 
+      if (user.role === UserRole.INSTRUCTOR && !dto.is_active) {
+        const owned = await manager.count(Course, {
+          where: { instructor_id: id, status: Not(CourseStatus.ARCHIVED) },
+        });
+        if (owned)
+          throw new BadRequestException(
+            'Transfer or archive this instructor’s courses before deactivating them',
+          );
+      }
+      if (user.is_active && !dto.is_active) {
+        user.token_version = (user.token_version ?? 0) + 1;
+      }
       user.is_active = dto.is_active;
 
       await manager.save(User, user);

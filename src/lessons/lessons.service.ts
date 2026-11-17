@@ -1,3 +1,4 @@
+import { assertTaAssigned } from '../common/course-access';
 import {
   Injectable,
   NotFoundException,
@@ -7,10 +8,7 @@ import {
 } from '@nestjs/common';
 
 import { InjectRepository } from '@nestjs/typeorm';
-import {
-  Repository,
-  QueryFailedError,
-} from 'typeorm';
+import { Repository, QueryFailedError } from 'typeorm';
 
 import { Lesson } from './lesson.entity';
 import { Course } from '../courses/course.entity';
@@ -41,38 +39,109 @@ export class LessonsService {
   ) {}
 
   async markComplete(lessonId: string, studentId: string) {
-    const lesson = await this.lessonRepository.findOne({ where: { id: lessonId } });
-    if (!lesson) throw new NotFoundException('Lesson not found');
-    const enrollment = await this.enrollmentRepository.findOne({ where: { course_id: lesson.course_id, student_id: studentId } });
-    if (!enrollment || (enrollment.status !== EnrollmentStatus.ACTIVE && enrollment.status !== EnrollmentStatus.COMPLETED)) {
-      throw new ForbiddenException('An active course enrollment is required');
-    }
-    let progress = await this.progressRepository.findOne({ where: { enrollment_id: enrollment.id, lesson_id: lessonId } });
-    if (!progress) {
-      progress = this.progressRepository.create({ enrollment_id: enrollment.id, lesson_id: lessonId });
-      await this.progressRepository.save(progress);
-    }
-    const [lessonCount, completedCount] = await Promise.all([
-      this.lessonRepository.count({ where: { course_id: lesson.course_id } }),
-      this.progressRepository.count({ where: { enrollment_id: enrollment.id } }),
-    ]);
-    if (lessonCount > 0 && lessonCount === completedCount && enrollment.status !== EnrollmentStatus.COMPLETED) {
-      enrollment.status = EnrollmentStatus.COMPLETED;
-      enrollment.completed_at = new Date();
-      await this.enrollmentRepository.save(enrollment);
-    }
-    return { lesson_id: lessonId, completed_at: progress.completed_at, completed_lessons: completedCount, total_lessons: lessonCount, completed: lessonCount > 0 && lessonCount === completedCount };
+    return this.lessonRepository.manager.transaction(async (manager) => {
+      const lesson = await manager.findOne(Lesson, { where: { id: lessonId } });
+      if (!lesson) throw new NotFoundException('Lesson not found');
+      const course = await manager.findOne(Course, {
+        where: { id: lesson.course_id },
+      });
+      if (!course || course.status !== CourseStatus.PUBLISHED)
+        throw new BadRequestException('Course is not published');
+      const enrollment = await manager.findOne(Enrollment, {
+        where: { course_id: lesson.course_id, student_id: studentId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (
+        !enrollment ||
+        ![EnrollmentStatus.ACTIVE, EnrollmentStatus.COMPLETED].includes(
+          enrollment.status,
+        )
+      ) {
+        throw new ForbiddenException(
+          'An active or completed course enrollment is required',
+        );
+      }
+      let progress = await manager.findOne(LessonProgress, {
+        where: { enrollment_id: enrollment.id, lesson_id: lessonId },
+      });
+      if (!progress)
+        progress = await manager.save(
+          LessonProgress,
+          manager.create(LessonProgress, {
+            enrollment_id: enrollment.id,
+            lesson_id: lessonId,
+          }),
+        );
+      const lessonCount = await manager.count(Lesson, {
+        where: { course_id: lesson.course_id },
+      });
+      const completedCount = await manager.count(LessonProgress, {
+        where: { enrollment_id: enrollment.id },
+      });
+      if (
+        lessonCount > 0 &&
+        lessonCount === completedCount &&
+        enrollment.status !== EnrollmentStatus.COMPLETED
+      ) {
+        enrollment.status = EnrollmentStatus.COMPLETED;
+        enrollment.completed_at = new Date();
+        await manager.save(Enrollment, enrollment);
+      }
+      return {
+        lesson_id: lessonId,
+        completed_at: progress.completed_at,
+        completed_lessons: completedCount,
+        total_lessons: lessonCount,
+        completed: lessonCount > 0 && lessonCount === completedCount,
+      };
+    });
+  }
+
+  async getStudentProgress(
+    courseId: string,
+    studentId: string,
+    user: { id: string; role: UserRole },
+  ) {
+    const course = await this.getCourse(courseId);
+    this.checkInstructorOwnership(course, user);
+    return this.getProgress(courseId, studentId);
   }
 
   async getProgress(courseId: string, studentId: string) {
-    const enrollment = await this.enrollmentRepository.findOne({ where: { course_id: courseId, student_id: studentId } });
-    if (!enrollment || (enrollment.status !== EnrollmentStatus.ACTIVE && enrollment.status !== EnrollmentStatus.COMPLETED)) throw new NotFoundException('Enrollment not found');
-    const lessons = await this.lessonRepository.find({ where: { course_id: courseId }, order: { sequence_number: 'ASC' }, select: { id: true, title: true, sequence_number: true } });
-    const progress = await this.progressRepository.find({ where: { enrollment_id: enrollment.id } });
-    const completed = new Map(progress.map((item) => [item.lesson_id, item.completed_at]));
-    const data = lessons.map((lesson) => ({ ...lesson, completed_at: completed.get(lesson.id) ?? null }));
+    const enrollment = await this.enrollmentRepository.findOne({
+      where: { course_id: courseId, student_id: studentId },
+    });
+    if (
+      !enrollment ||
+      (enrollment.status !== EnrollmentStatus.ACTIVE &&
+        enrollment.status !== EnrollmentStatus.COMPLETED)
+    )
+      throw new NotFoundException('Enrollment not found');
+    const lessons = await this.lessonRepository.find({
+      where: { course_id: courseId },
+      order: { sequence_number: 'ASC' },
+      select: { id: true, title: true, sequence_number: true },
+    });
+    const progress = await this.progressRepository.find({
+      where: { enrollment_id: enrollment.id },
+    });
+    const completed = new Map(
+      progress.map((item) => [item.lesson_id, item.completed_at]),
+    );
+    const data = lessons.map((lesson) => ({
+      ...lesson,
+      completed_at: completed.get(lesson.id) ?? null,
+    }));
     const completedCount = progress.length;
-    return { course_id: courseId, completed_lessons: completedCount, total_lessons: lessons.length, percentage: lessons.length ? Math.round((completedCount / lessons.length) * 100) : 0, lessons: data };
+    return {
+      course_id: courseId,
+      completed_lessons: completedCount,
+      total_lessons: lessons.length,
+      percentage: lessons.length
+        ? Math.round((completedCount / lessons.length) * 100)
+        : 0,
+      lessons: data,
+    };
   }
 
   // Create a lesson inside a course.
@@ -86,9 +155,7 @@ export class LessonsService {
     this.checkInstructorOwnership(course, user);
 
     if (course.status === CourseStatus.ARCHIVED) {
-      throw new BadRequestException(
-        'Cannot add lessons to an archived course',
-      );
+      throw new BadRequestException('Cannot add lessons to an archived course');
     }
 
     const existingLesson = await this.lessonRepository.findOne({
@@ -125,7 +192,10 @@ export class LessonsService {
   ) {
     await this.checkCourseAccess(courseId, user);
     const safePage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
-    const safeLimit = Number.isFinite(limit) && limit > 0 ? Math.min(100, Math.floor(limit)) : 10;
+    const safeLimit =
+      Number.isFinite(limit) && limit > 0
+        ? Math.min(100, Math.floor(limit))
+        : 10;
     const [lessons, total] = await this.lessonRepository.findAndCount({
       where: { course_id: courseId },
       order: {
@@ -155,10 +225,7 @@ export class LessonsService {
   }
 
   // Retrieve one lesson.
-  async findOne(
-    lessonId: string,
-    user: { id: string; role: UserRole },
-  ) {
+  async findOne(lessonId: string, user: { id: string; role: UserRole }) {
     const lesson = await this.lessonRepository.findOne({
       where: { id: lessonId },
     });
@@ -221,10 +288,7 @@ export class LessonsService {
   }
 
   // Delete a lesson.
-  async remove(
-    lessonId: string,
-    user: { id: string; role: UserRole },
-  ) {
+  async remove(lessonId: string, user: { id: string; role: UserRole }) {
     const lesson = await this.lessonRepository.findOne({
       where: { id: lessonId },
     });
@@ -268,19 +332,13 @@ export class LessonsService {
     course: Course,
     user: { id: string; role: UserRole },
   ) {
-    if (
-      user.role === UserRole.INSTRUCTOR &&
-      course.instructor_id !== user.id
-    ) {
+    if (user.role === UserRole.INSTRUCTOR && course.instructor_id !== user.id) {
       throw new ForbiddenException(
         'You cannot manage another instructor’s course',
       );
     }
 
-    if (
-      user.role !== UserRole.INSTRUCTOR &&
-      user.role !== UserRole.ADMIN
-    ) {
+    if (user.role !== UserRole.INSTRUCTOR && user.role !== UserRole.ADMIN) {
       throw new ForbiddenException(
         'You do not have permission to manage lessons',
       );
@@ -293,6 +351,11 @@ export class LessonsService {
     user: { id: string; role: UserRole },
   ) {
     const course = await this.getCourse(courseId);
+
+    if (user.role === UserRole.TA) {
+      await assertTaAssigned(this.courseRepository.manager, courseId, user.id);
+      return course;
+    }
 
     if (user.role === UserRole.ADMIN) {
       return course;
@@ -319,10 +382,8 @@ export class LessonsService {
 
       if (
         enrollment &&
-        (
-          enrollment.status === EnrollmentStatus.ACTIVE ||
-          enrollment.status === EnrollmentStatus.COMPLETED
-        )
+        (enrollment.status === EnrollmentStatus.ACTIVE ||
+          enrollment.status === EnrollmentStatus.COMPLETED)
       ) {
         return course;
       }

@@ -1,3 +1,5 @@
+import type { Request } from 'express';
+import { UpdateSubmissionDto } from './dto/update-submission.dto';
 import {
   Controller,
   Get,
@@ -8,12 +10,8 @@ import {
   ParseUUIDPipe,
   Req,
 } from '@nestjs/common';
-import type { Request } from 'express';
 
-import {
-  ApiTags,
-  ApiBearerAuth,
-} from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
 import { SubmissionsService } from './submissions.service';
 import { CreateSubmissionDto } from './dto/create-submission.dto';
@@ -26,9 +24,7 @@ import { UserRole } from '../common/enums/user-role.enum';
 @ApiBearerAuth('JWT-auth')
 @Controller()
 export class SubmissionsController {
-  constructor(
-    private readonly submissionsService: SubmissionsService,
-  ) {}
+  constructor(private readonly submissionsService: SubmissionsService) {}
 
   // Student submits assignment.
   @Roles(UserRole.STUDENT)
@@ -47,15 +43,22 @@ export class SubmissionsController {
     );
   }
 
+  @Roles(UserRole.STUDENT)
+  @Patch('submissions/:id')
+  resubmit(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateSubmissionDto,
+    @CurrentUser('id') studentId: string,
+    @Req() request: Request,
+  ) {
+    return this.submissionsService.resubmit(id, dto, studentId, request.ip);
+  }
+
   // Student views own submissions.
   @Roles(UserRole.STUDENT)
   @Get('submissions/me')
-  getMySubmissions(
-    @CurrentUser('id') studentId: string,
-  ) {
-    return this.submissionsService.getMySubmissions(
-      studentId,
-    );
+  getMySubmissions(@CurrentUser('id') studentId: string) {
+    return this.submissionsService.getMySubmissions(studentId);
   }
 
   // Instructor/admin views assignment submissions.
@@ -65,13 +68,10 @@ export class SubmissionsController {
     @Param('assignmentId', ParseUUIDPipe) assignmentId: string,
     @CurrentUser() user: any,
   ) {
-    return this.submissionsService.getAssignmentSubmissions(
-      assignmentId,
-      user,
-    );
+    return this.submissionsService.getAssignmentSubmissions(assignmentId, user);
   }
 
-  // Instructor/admin grades submission.
+  // Only the owning instructor publishes final grades.
   @Roles(UserRole.INSTRUCTOR)
   @Patch('submissions/:id/grade')
   grade(
@@ -80,11 +80,6 @@ export class SubmissionsController {
     @CurrentUser() user: any,
     @Req() request: Request,
   ) {
-    return this.submissionsService.grade(
-      id,
-      dto,
-      user,
-      request.ip,
-    );
+    return this.submissionsService.grade(id, dto, user, request.ip);
   }
 }

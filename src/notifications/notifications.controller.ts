@@ -5,10 +5,7 @@ import {
   DefaultValuePipe,
   ParseIntPipe,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiBearerAuth,
-} from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
 import { NotificationsService } from './notifications.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -19,11 +16,9 @@ import { UserRole } from '../common/enums/user-role.enum';
 @ApiBearerAuth('JWT-auth')
 @Controller('notifications')
 export class NotificationsController {
-  constructor(
-    private readonly notificationsService: NotificationsService,
-  ) {}
+  constructor(private readonly notificationsService: NotificationsService) {}
 
-  @Roles(UserRole.STUDENT, UserRole.INSTRUCTOR, UserRole.ADMIN)
+  @Roles(UserRole.STUDENT, UserRole.TA, UserRole.INSTRUCTOR, UserRole.ADMIN)
   @Get('me')
   getMyNotifications(
     @CurrentUser('id') userId: string,

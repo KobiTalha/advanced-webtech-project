@@ -34,13 +34,13 @@ export class UpdateProfileDto {
   @ApiPropertyOptional({
     example: 'alex@example.com',
     description: 'Updated email address',
-    maxLength: 150,
+    maxLength: 254,
   })
   @ValidateIf((_object, value) => value !== undefined)
   @Transform(({ value }) =>
     typeof value === 'string' ? value.trim().toLowerCase() : value,
   )
   @IsEmail()
-  @MaxLength(150)
+  @MaxLength(254)
   email?: string;
 }

@@ -9,11 +9,7 @@ import {
   ParseUUIDPipe,
   Query,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiBearerAuth,
-  ApiQuery,
-} from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { LessonsService } from './lessons.service';
 
 import { CreateLessonDto } from './dto/create-lesson.dto';
@@ -28,9 +24,7 @@ import { UserRole } from '../common/enums/user-role.enum';
 @ApiBearerAuth('JWT-auth')
 @Controller()
 export class LessonsController {
-  constructor(
-    private readonly lessonsService: LessonsService,
-  ) {}
+  constructor(private readonly lessonsService: LessonsService) {}
 
   // Create a lesson.
   @Roles(UserRole.INSTRUCTOR, UserRole.ADMIN)
@@ -40,22 +34,20 @@ export class LessonsController {
     @Body() dto: CreateLessonDto,
     @CurrentUser() user: any,
   ) {
-    return this.lessonsService.create(
-      courseId,
-      dto,
-      user,
-    );
+    return this.lessonsService.create(courseId, dto, user);
   }
 
   // List all lessons in a course.
-  @Roles(
-    UserRole.STUDENT,
-    UserRole.INSTRUCTOR,
-    UserRole.ADMIN,
-  )
+  @Roles(UserRole.STUDENT, UserRole.TA, UserRole.INSTRUCTOR, UserRole.ADMIN)
   @Get('courses/:courseId/lessons')
   @ApiQuery({ name: 'page', required: false, type: Number, minimum: 1 })
-  @ApiQuery({ name: 'limit', required: false, type: Number, minimum: 1, maximum: 100 })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    minimum: 1,
+    maximum: 100,
+  })
   findAll(
     @Param('courseId', ParseUUIDPipe) courseId: string,
     @CurrentUser() user: any,
@@ -72,27 +64,36 @@ export class LessonsController {
 
   @Roles(UserRole.STUDENT)
   @Post('lessons/:id/complete')
-  markComplete(@Param('id', ParseUUIDPipe) id: string, @CurrentUser('id') studentId: string) {
+  markComplete(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('id') studentId: string,
+  ) {
     return this.lessonsService.markComplete(id, studentId);
   }
 
   @Roles(UserRole.STUDENT)
   @Get('courses/:courseId/progress')
-  getProgress(@Param('courseId', ParseUUIDPipe) courseId: string, @CurrentUser('id') studentId: string) {
+  getProgress(
+    @Param('courseId', ParseUUIDPipe) courseId: string,
+    @CurrentUser('id') studentId: string,
+  ) {
     return this.lessonsService.getProgress(courseId, studentId);
   }
 
-  // View one lesson.
-  @Roles(
-    UserRole.STUDENT,
-    UserRole.INSTRUCTOR,
-    UserRole.ADMIN,
-  )
-  @Get('lessons/:id')
-  findOne(
-    @Param('id', ParseUUIDPipe) id: string,
-    @CurrentUser() user: any,
+  @Roles(UserRole.INSTRUCTOR, UserRole.ADMIN)
+  @Get('courses/:courseId/students/:studentId/progress')
+  getStudentProgress(
+    @Param('courseId', ParseUUIDPipe) courseId: string,
+    @Param('studentId', ParseUUIDPipe) studentId: string,
+    @CurrentUser() user: { id: string; role: UserRole },
   ) {
+    return this.lessonsService.getStudentProgress(courseId, studentId, user);
+  }
+
+  // View one lesson.
+  @Roles(UserRole.STUDENT, UserRole.TA, UserRole.INSTRUCTOR, UserRole.ADMIN)
+  @Get('lessons/:id')
+  findOne(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: any) {
     return this.lessonsService.findOne(id, user);
   }
 
@@ -104,20 +105,13 @@ export class LessonsController {
     @Body() dto: UpdateLessonDto,
     @CurrentUser() user: any,
   ) {
-    return this.lessonsService.update(
-      id,
-      dto,
-      user,
-    );
+    return this.lessonsService.update(id, dto, user);
   }
 
   // Delete a lesson.
   @Roles(UserRole.INSTRUCTOR, UserRole.ADMIN)
   @Delete('lessons/:id')
-  remove(
-    @Param('id', ParseUUIDPipe) id: string,
-    @CurrentUser() user: any,
-  ) {
+  remove(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: any) {
     return this.lessonsService.remove(id, user);
   }
 }

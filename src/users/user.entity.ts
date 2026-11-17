@@ -23,7 +23,7 @@ export class User {
   @Column({ length: 120 })
   full_name: string;
 
-  @Column({ unique: true, length: 150 })
+  @Column({ unique: true, length: 254 })
   email: string;
 
   @Column({ length: 255, select: false })
@@ -38,6 +38,9 @@ export class User {
 
   @Column({ default: true })
   is_active: boolean;
+
+  @Column({ type: 'integer', default: 0 })
+  token_version: number;
 
   @CreateDateColumn()
   created_at: Date;
